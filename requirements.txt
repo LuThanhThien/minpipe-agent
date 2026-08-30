@@ -1,9 +1,12 @@
 --index-url https://download.pytorch.org/whl/cpu
 --extra-index-url https://pypi.org/simple
 
-torch
-numpy
+torch==2.13.0+cpu
+numpy==2.5.2
 
-pytest
-black
-mdformat
+pytest==9.1.1
+black==26.5.1
+mdformat==1.0.0
+
+loguru
+langgraph
