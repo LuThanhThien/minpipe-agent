@@ -1,38 +1,53 @@
-from typing import Annotated, Any, Dict, TypedDict
+from typing import Any, Dict
 
-from langchain_core.messages import AnyMessage
-from langgraph.graph import END, START, StateGraph
-from langgraph.graph.message import add_messages
-from langgraph.prebuilt import tools_condition
+from langgraph.graph import START, END, StateGraph
 
 from .config import resolve_node_provider_config
-from .providers import ProviderRegistry, ModelProvider
+from .providers import ModelProvider, ProviderRegistry
+from .state import GraphState
 from .nodes import *
+from .routes import *
 
 
-class AgentState(TypedDict):
-    file: str
-    messages: Annotated[list[AnyMessage], add_messages]
-    response: str
-
-
-def create_provider(config: Dict[str, Any], name: str) -> ModelProvider:
-    node_config = resolve_node_provider_config(config, node_name=name)
-    provider = ProviderRegistry.create(config=node_config)
-    return provider
+def build_provider(
+    config: Dict[str, Any],
+    node: str,
+) -> ModelProvider:
+    node_config = resolve_node_provider_config(
+        config,
+        node_name=node,
+    )
+    return ProviderRegistry.create(config=node_config)
 
 
 def build_graph(config):
+    graph = StateGraph(GraphState)
 
-    graph = StateGraph(AgentState)
+    # Providers
+    generate_provider = build_provider(config, "generate_op")
 
-    explain_code_provider = create_provider(config, "explain_code")
+    # Nodes
+    graph.add_node("reset_state", SetStateNode({"attempts": 0, "max_attempts": 3}))
+    graph.add_node("prepare_repo", PrepareRepoNode())
     graph.add_node(
-        "explain_code",
-        ExplainCodeNode(explain_code_provider),
+        "generate_op",
+        GenerateOpNode(
+            generate_provider,
+        ),
     )
 
-    graph.add_edge(START, "explain_code")
-    graph.add_edge("explain_code", END)
+    # Edges
+    graph.add_edge(START, "reset_state")
+    graph.add_edge(START, "prepare_repo")
+    graph.add_edge("prepare_repo", "generate_op")
+    graph.add_conditional_edges(
+        "generate_op",
+        after_generate_op_route(),
+        {
+            "success": END,
+            "retry": "generate_op",
+            "failed": END,
+        },
+    )
 
     return graph.compile()
