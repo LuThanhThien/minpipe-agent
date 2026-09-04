@@ -5,10 +5,12 @@ from .config import load_config
 from .graph import build_graph
 
 
-def run(file_path: str, config: Dict[str, Any]) -> str:
+def run(args: argparse.Namespace, config: Dict[str, Any]) -> str:
     graph = build_graph(config)
-    response = graph.invoke({"file": file_path})
-    return response["response"]
+    response = graph.invoke({"test_folder": args.test_folder})
+
+    lines = ["Test run completed."]
+    return "\n".join(lines)
 
 
 def main():
@@ -22,14 +24,15 @@ def main():
         help="Python config file defining a CONFIG dictionary.",
     )
     parser.add_argument(
-        "file",
-        help="Source file to explain.",
+        "--test-folder",
+        default="./models",
+        help="Test folder to run tests for.",
     )
 
     args = parser.parse_args()
 
     config = load_config(args.config)
-    print(run(file_path=args.file, config=config))
+    print(run(args=args, config=config))
 
 
 if __name__ == "__main__":
