@@ -26,6 +26,7 @@ def resolve_node_provider_config(
 
     if "nodes" in config:
         nodes = config.get("nodes", {})
+        assert node_name in nodes, f"CONFIG['nodes']['{node_name}'] is not found"
         node_config = nodes.get(node_name)
         if not isinstance(node_config, dict):
             raise ValueError(f"CONFIG['nodes']['{node_name}'] must be a dictionary")

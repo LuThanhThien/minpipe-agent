@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel 2>/dev/null || echo "$SCRIPT_DIR")"
+
+source "$REPO_DIR/.venv/bin/activate"
+cd "$REPO_DIR"
+
+export PYTHONPATH="${PYTHONPATH:+$PYTHONPATH:}$REPO_DIR"

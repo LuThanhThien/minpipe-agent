@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import TypedDict
 
 from .base_node import BaseNode
 from ..tools import read_file
@@ -15,24 +15,37 @@ When given code, explain:
 
 Do not modify the code.
 Do not generate replacement code unless explicitly asked.
-"""
-
-
-def build_code_explainer_prompt(code: str) -> str:
-    return f"""{CODE_EXPLAINER_INSTRUCTIONS}
 
 Code:
-{code}
+{}
 """
 
 
 class ExplainCodeNode(BaseNode):
-    def __call__(self, state):
-        code = read_file.invoke({"path": state["file"]})
+    def __init__(self, provider, k_file: str, k_response: str):
+        super().__init__()
+        self.provider = provider
+        self.k_file = k_file
+        self.k_response = k_response
 
-        prompt = build_code_explainer_prompt(code)
+    def invoke(self, state: TypedDict):
+        file = state.get(self.k_file, None)
+
+        if file is None:
+            return {}
+
+        code = read_file(path=file)
+
+        prompt = self._build_prompt(code)
         text = self.provider.invoke(prompt)
 
         return {
-            "response": text,
+            self.k_response: text,
         }
+
+    def _build_prompt(self, code: str) -> str:
+        return CODE_EXPLAINER_INSTRUCTIONS.format(code)
+
+    def print_result(self, result: TypedDict):
+        print("Code Explanation:")
+        print(result[self.k_response])
