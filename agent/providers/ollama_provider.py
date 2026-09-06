@@ -16,12 +16,14 @@ class OllamaProvider(ModelProvider):
         model: str = "qwen2.5-coder:0.5b",
         base_url: str = "http://localhost:11434",
         auto_pull: bool = True,
+        timeout: int = 60,
     ):
         super().__init__()
 
         self.model = model
         self.base_url = base_url
         self.auto_pull = auto_pull
+        self.timeout = timeout
         self._ollama_process: Optional[subprocess.Popen] = None
 
     def _start_server(self) -> None:
@@ -87,7 +89,7 @@ class OllamaProvider(ModelProvider):
                 "prompt": prompt,
                 "stream": False,
             },
-            timeout=300,
+            timeout=self.timeout,
         )
 
         response.raise_for_status()

@@ -1,0 +1,20 @@
+CONFIG = dict(
+    nodes=dict(
+        inspect_op=dict(
+            name="OllamaProvider",
+            init_config=dict(
+                model="qwen2.5-coder:0.5b",
+                base_url="http://localhost:11434",
+                timeout=60,
+            ),
+        ),
+        generate_op=dict(
+            name="OllamaProvider",
+            init_config=dict(
+                model="qwen2.5-coder:7b",
+                base_url="http://localhost:11434",
+                timeout=120,
+            ),
+        ),
+    ),
+)
