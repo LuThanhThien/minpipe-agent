@@ -50,6 +50,10 @@ def build_graph(config):
         FileFormatterNode(),
     )
     graph.add_node(
+        "initial_validate",
+        ValidateOpNode(),
+    )
+    graph.add_node(
         "validate_op",
         ValidateOpNode(),
     )
@@ -65,7 +69,17 @@ def build_graph(config):
     # Edges
     graph.add_edge(START, "reset_state")
     graph.add_edge("reset_state", "prepare_repo")
-    graph.add_edge("prepare_repo", "generate_op")
+    graph.add_edge("prepare_repo", "initial_validate")
+    # First validate to catch issue / return early
+    graph.add_conditional_edges(
+        "initial_validate",
+        after_validate_op_route(),
+        {
+            "success": END,
+            "retry": "generate_op",
+            "failed": "generate_op",
+        },
+    )
     graph.add_conditional_edges(
         "generate_op",
         after_generate_op_route(),
