@@ -7,9 +7,14 @@ from .graph import build_graph
 
 def run(args: argparse.Namespace, config: Dict[str, Any]) -> str:
     graph = build_graph(config)
-    response = graph.invoke({"op": args.op, "test": args.test})
-
+    response = graph.invoke(
+        {"op": args.op, "test": args.test, "artifact_dir": args.artifact_dir}
+    )
     lines = ["Test run completed."]
+
+    patch_path = response.get("patch_path")
+    lines += [f"Patch generated: {patch_path}"]
+
     return "\n".join(lines)
 
 
@@ -31,6 +36,11 @@ def main():
     parser.add_argument(
         "--test",
         required=True,
+        help="File to run op test",
+    )
+    parser.add_argument(
+        "--artifact-dir",
+        default="./generated",
         help="File to run op test",
     )
 

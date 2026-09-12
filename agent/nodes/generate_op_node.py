@@ -1,136 +1,12 @@
 import json
 import re
-from typing import TypedDict
 
 from loguru import logger
 
 from .base_node import BaseNode
 from ..providers import ModelProvider
-from ..tools import apply_changes, read_file
-
-GENERATE_OP_INSTRUCTIONS = GENERATE_OP_INSTRUCTIONS = """
-You are implementing one missing or incorrect operation in MinPipe.
-
-TARGET OPERATION
-{op}
-
-REPRODUCER TEST
-{test}
-
-CURRENT FAILURE
-{failure}
-
-TEST SOURCE
-{test_source}
-
-EXISTING IMPLEMENTATION FOR CURRENT OP
-{existing_op_source}
-
-OPERATION FRAMEWORK / REGISTRY
-{registry_source}
-
-OPERATION PACKAGE REGISTRATION
-{ops_init_source}
-
-WORKING OPERATION EXAMPLES
-{similar_ops}
-
-PREVIOUS VALIDATION OUTPUT
-{previous_validation_output}
-
-
-MINPIPE ARCHITECTURE RULES
-
-- Operations register themselves through @Operation.register.
-- The decorator executes only when the Python module defining the operation is imported.
-- minpipe/ops/__init__.py imports supported operation modules.
-- If an operation module is not imported, its registration decorator does not execute.
-- Runtime execution resolves operations through the operation registry.
-
-Creating the operation implementation alone is NOT sufficient.
-You must verify the complete integration path:
-
-    implementation
-        -> module import
-        -> decorator execution
-        -> registry entry
-        -> runtime lookup
-
-
-DIAGNOSIS CHECKLIST
-
-Before generating changes, determine:
-
-1. Does minpipe/ops/{op}.py exist?
-2. If it exists, is its implementation correct?
-3. Is the {op} module imported by minpipe/ops/__init__.py?
-4. Will importing minpipe.ops execute @Operation.register for {op}?
-5. Will the runtime operation registry resolve "{op}"?
-
-Do not assume registration is complete merely because
-@Operation.register appears in the implementation file.
-
-
-TASK
-
-Enable support for the target operation.
-
-Requirements:
-- Diagnose whether the operation is missing, incorrectly implemented,
-  incorrectly imported, or incorrectly registered.
-- Make the minimum necessary source changes.
-- Follow existing MinPipe patterns shown in the context.
-- Do not modify tests.
-- Do not weaken validation.
-- Do not modify unrelated files.
-- If an implementation already exists, fix it instead of creating a duplicate.
-- Include ALL required files in "changes".
-- Do not return a partial implementation.
-
-When modifying an existing file:
-- Preserve its current import style and structure.
-- Make the smallest possible diff.
-- Do not refactor unrelated existing code.
-
-SUCCESS CONDITION
-
-The change is complete only if:
-
-1. The reproducer test can pass.
-2. Importing minpipe.ops loads the target operation module.
-3. The target operation's registration decorator executes.
-4. Runtime lookup resolves "{op}" successfully.
-
-EDITING RULES
-
-- Preserve all unrelated existing code, imports, formatting, and behavior.
-- Make only the minimal changes required for the requested operation.
-- Do not remove, rewrite, or reorganize existing code unless directly necessary.
-- When updating registration files such as `minpipe/ops/__init__.py`, add the required import while preserving all existing imports and registrations.
-
-OUTPUT FORMAT 
-
-Return ONLY valid JSON in this format:
-
-{{
-  "diagnosis": {{
-    "implementation_exists": "...",
-    "implementation_correct": "...",
-    "module_imported": "...",
-    "registration_triggered": "...",
-    "runtime_lookup_available": "..."
-  }},
-  "changes": [
-    {{
-      "path": "path/to/file.py",
-      "content": "complete new file content"
-    }}
-  ]
-}}
-
-Do not use markdown code fences.
-Do not include explanations outside the JSON.
-"""
+from ..state import GraphState
+from ..tools import apply_changes, read_file, read_prompt
 
 
 class GenerateOpNode(BaseNode):
@@ -141,18 +17,29 @@ class GenerateOpNode(BaseNode):
         super().__init__()
 
         self.provider = provider
-        self.boundaries = ["./minpipe"]
 
-    def invoke(self, state: TypedDict):
-        attempts = state.get("attempts", 0)
+    def invoke(self, state: GraphState):
+        attempts = state.get("generate_attempts", 0) + 1
 
-        # Temporary hardcoded values.
-        # Later replace these with state values.
-        op = state.get("op", None)
-        test = state.get("test", None)
-        if op is None or test is None:
-            logger.warning(f"Op/test are not found in the state")
-            return {}
+        worktree_root = state.get("worktree_root")
+        if not worktree_root:
+            return {
+                "generate_succeeded": False,
+                "generate_error": "worktree_root is not available in graph state",
+                "generate_attempts": attempts,
+            }
+
+        op = state.get("op")
+        test = state.get("test")
+        boundaries = state.get("boundaries", [])
+
+        if not op or not test:
+            logger.warning("Op/test are not found in the state")
+            return {
+                "generate_succeeded": False,
+                "generate_error": "op/test are not available in graph state",
+                "generate_attempts": attempts,
+            }
 
         response = ""
         changed_files = []
@@ -161,6 +48,7 @@ class GenerateOpNode(BaseNode):
             context = self._build_context(
                 op=op,
                 test=test,
+                worktree_root=worktree_root,
                 validation_output=state.get(
                     "validation_output",
                     "",
@@ -180,34 +68,46 @@ class GenerateOpNode(BaseNode):
             logger.info("Response:\n{}", response)
 
             changes = self._parse_response(response)
+
             self._validate_changes(changes)
 
             changed_files = apply_changes(
-                changes,
-                self.boundaries,
+                repo_root=worktree_root,
+                changes=changes,
+                boundaries=boundaries,
             )
 
+            if not changes:
+                return {
+                    "generate_changed_files": changed_files,
+                    "generate_response": response,
+                    "generate_succeeded": False,
+                    "generate_error": "No changes were made.",
+                    "generate_attempts": attempts,
+                }
+
             return {
-                "changed_files": changed_files,
-                "response": response,
-                "success": True,
-                "error": "",
-                "attempts": attempts,
+                "generate_changed_files": changed_files,
+                "generate_response": response,
+                "generate_succeeded": True,
+                "generate_error": "",
+                "generate_attempts": attempts,
             }
 
         except Exception as exc:
             return {
-                "changed_files": changed_files,
-                "response": response,
-                "success": False,
-                "error": str(exc),
-                "attempts": attempts,
+                "generate_changed_files": changed_files,
+                "generate_response": response,
+                "generate_succeeded": False,
+                "generate_error": str(exc),
+                "generate_attempts": attempts,
             }
 
     def _build_context(
         self,
         op: str,
         test: str,
+        worktree_root: str,
         validation_output: str,
     ) -> dict:
         return {
@@ -215,19 +115,26 @@ class GenerateOpNode(BaseNode):
                 validation_output,
                 op,
             ),
-            "test_source": self._read_optional(test),
+            "test_source": self._read_optional(
+                worktree_root,
+                test,
+            ),
             "existing_op_source": self._read_optional(
+                worktree_root,
                 f"minpipe/ops/{op}.py",
                 default="Not found",
             ),
             "registry_source": self._read_optional(
+                worktree_root,
                 "minpipe/ops/operation.py",
             ),
             "ops_init_source": self._read_optional(
+                worktree_root,
                 "minpipe/ops/__init__.py",
             ),
             "similar_ops": self._build_similar_ops_context(
-                op,
+                op=op,
+                worktree_root=worktree_root,
             ),
             "previous_validation_output": (
                 validation_output
@@ -239,6 +146,7 @@ class GenerateOpNode(BaseNode):
     def _build_similar_ops_context(
         self,
         op: str,
+        worktree_root: str,
     ) -> str:
         candidates = [
             "relu",
@@ -255,6 +163,7 @@ class GenerateOpNode(BaseNode):
             path = f"minpipe/ops/{candidate}.py"
 
             source = self._read_optional(
+                worktree_root,
                 path,
                 default="",
             )
@@ -271,11 +180,15 @@ class GenerateOpNode(BaseNode):
 
     def _read_optional(
         self,
+        worktree_root: str,
         path: str,
         default: str = "",
     ) -> str:
         try:
-            return read_file(path)
+            return read_file(
+                repo_root=worktree_root,
+                path=path,
+            )
         except (FileNotFoundError, OSError):
             return default
 
@@ -310,7 +223,7 @@ class GenerateOpNode(BaseNode):
         test: str,
         context: dict,
     ) -> str:
-        return GENERATE_OP_INSTRUCTIONS.format(
+        return read_prompt("generate_op.md").format(
             op=op,
             test=test,
             failure=context["failure"],
@@ -341,13 +254,15 @@ class GenerateOpNode(BaseNode):
             data = json.loads(text)
         except json.JSONDecodeError as exc:
             raise RuntimeError(
-                f"GenerateOpNode received invalid JSON:\n{response}"
+                "GenerateOpNode received invalid JSON:\n" f"{response}"
             ) from exc
 
         changes = data.get("changes")
 
         if not isinstance(changes, list):
-            raise RuntimeError("Model response does not contain a valid 'changes' list")
+            raise RuntimeError(
+                "Model response does not contain " "a valid 'changes' list"
+            )
 
         return changes
 
@@ -363,29 +278,29 @@ class GenerateOpNode(BaseNode):
                 raise RuntimeError("Invalid change entry")
 
             if path.startswith("models/"):
-                raise RuntimeError(f"Model attempted to modify test file: {path}")
+                raise RuntimeError("Model attempted to modify " f"test file: {path}")
 
             if "\n" not in content:
                 raise RuntimeError(
-                    f"Generated content does not look like source code: {path}"
+                    "Generated content does not " f"look like source code: {path}"
                 )
 
     def print_result(
         self,
-        result: TypedDict,
+        result: GraphState,
     ):
         changed_files = result.get(
-            "changed_files",
+            "generate_changed_files",
             [],
         )
 
         succeeded = result.get(
-            "success",
+            "generate_succeeded",
             False,
         )
 
         error = result.get(
-            "error",
+            "generate_error",
             "",
         )
 
@@ -408,4 +323,7 @@ class GenerateOpNode(BaseNode):
         )
 
         for file in changed_files:
-            logger.info("  {}", file)
+            logger.info(
+                "  {}",
+                file,
+            )
