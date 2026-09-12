@@ -53,6 +53,10 @@ class GenerateOpNode(BaseNode):
                     "validation_output",
                     "",
                 ),
+                generate_error=state.get(
+                    "generate_error",
+                    "",
+                ),
             )
 
             prompt = self._build_prompt(
@@ -109,6 +113,7 @@ class GenerateOpNode(BaseNode):
         test: str,
         worktree_root: str,
         validation_output: str,
+        generate_error: str,
     ) -> dict:
         return {
             "failure": self._extract_failure(
@@ -140,6 +145,9 @@ class GenerateOpNode(BaseNode):
                 validation_output
                 if validation_output
                 else "No previous targeted validation output."
+            ),
+            "previous_generate_error": (
+                generate_error if generate_error else "No previous generation error."
             ),
         }
 
@@ -233,6 +241,7 @@ class GenerateOpNode(BaseNode):
             ops_init_source=context["ops_init_source"],
             similar_ops=context["similar_ops"],
             previous_validation_output=context["previous_validation_output"],
+            previous_generate_error=context["previous_generate_error"],
         )
 
     def _parse_response(
