@@ -27,6 +27,9 @@ WORKING OPERATION EXAMPLES
 PREVIOUS VALIDATION OUTPUT
 {previous_validation_output}
 
+PREVIOUS GENERATION ERROR
+{previous_generate_error}
+
 MINPIPE ARCHITECTURE RULES
 
 - Operations register themselves through @Operation.register.
