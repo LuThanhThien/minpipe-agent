@@ -26,3 +26,33 @@ Run the agent with the default `configs/monkey.py` or provide another config fil
 python -m agent.main path/to/source.py
 python -m agent.main --config other_config.py path/to/source.py
 ```
+
+## Model Providers
+
+### Ollama Provider
+
+Install Ollama:
+
+```bash
+curl -fsSL https://ollama.com/install.sh | sh
+```
+
+### Copilot Provider
+
+First install/login:
+
+```bash
+npm install -g @github/copilot
+```
+
+Then 
+
+```bash
+copilot login
+```
+
+You can test programmatic invocation:
+
+```bash
+copilot -p "Write a Python function that adds two numbers" -s
+```
