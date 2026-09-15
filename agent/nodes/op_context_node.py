@@ -45,6 +45,7 @@ class OpContextNode(BaseNode):
                     "generate_error",
                     "",
                 ),
+                generate_changed_files=state.get("generate_changed_files", ""),
             )
 
             return {
@@ -67,6 +68,7 @@ class OpContextNode(BaseNode):
         worktree_root: str,
         validation_output: str,
         generate_error: str,
+        generate_changed_files: str,
     ) -> dict:
         return {
             "failure": self._extract_failure(
@@ -101,6 +103,11 @@ class OpContextNode(BaseNode):
             ),
             "previous_generate_error": (
                 generate_error if generate_error else "No previous generation error."
+            ),
+            "previous_generate_changed_files": (
+                generate_changed_files
+                if generate_changed_files
+                else "No previous changed found."
             ),
         }
 

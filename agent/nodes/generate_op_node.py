@@ -119,6 +119,7 @@ class GenerateOpNode(BaseNode):
             similar_ops=context["similar_ops"],
             previous_validation_output=context["previous_validation_output"],
             previous_generate_error=context["previous_generate_error"],
+            previous_generate_changed_files=context["previous_generate_changed_files"],
         )
 
     def _parse_response(
