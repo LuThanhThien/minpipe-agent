@@ -27,8 +27,11 @@ WORKING OPERATION EXAMPLES
 PREVIOUS VALIDATION OUTPUT
 {previous_validation_output}
 
-PREVIOUS GENERATION ERROR
+ERROR FROM PREVIOUS GENERATION
 {previous_generate_error}
+
+PREVIOUS GENERATED CHANGES
+{previous_generate_changed_files}
 
 MINPIPE ARCHITECTURE RULES
 
@@ -54,10 +57,10 @@ DIAGNOSIS CHECKLIST
 Before generating changes, determine:
 
 1. Does minpipe/ops/{op}.py exist?
-1. If it exists, is its implementation correct?
-1. Is the {op} module imported by minpipe/ops/__init__.py?
-1. Will importing minpipe.ops execute @Operation.register for {op}?
-1. Will the runtime operation registry resolve "{op}"?
+2. If it exists, is its implementation correct?
+3. Is the {op} module imported by minpipe/ops/__init__.py?
+4. Will importing minpipe.ops execute @Operation.register for {op}?
+5. Will the runtime operation registry resolve "{op}"?
 
 Do not assume registration is complete merely because
 @Operation.register appears in the implementation file.

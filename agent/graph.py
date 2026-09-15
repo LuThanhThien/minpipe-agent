@@ -79,7 +79,7 @@ def build_graph(config):
         "initial_validate",
         after_validate_op_route(),
         {
-            "success": END,
+            "success": "cleanup_repo",
             "retry": "op_context",
             "failed": "op_context",
         },
@@ -89,7 +89,7 @@ def build_graph(config):
         after_op_context_route(),
         {
             "success": "generate_op",
-            "failed": END,
+            "failed": "cleanup_repo",
         },
     )
     graph.add_conditional_edges(
@@ -98,7 +98,7 @@ def build_graph(config):
         {
             "success": "format_files",
             "retry": "generate_op",
-            "failed": END,
+            "failed": "cleanup_repo",
         },
     )
     # NOTE: either way, goes to validation
@@ -115,8 +115,8 @@ def build_graph(config):
         after_validate_op_route(),
         {
             "success": "save_patch",
-            "retry": "generate_op",
-            "failed": END,
+            "retry": "op_context",
+            "failed": "cleanup_repo",
         },
     )
     graph.add_edge(
