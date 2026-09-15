@@ -7,3 +7,4 @@ from .save_patch_node import SavePatchNode
 from .cleanup_repo_node import CleanupRepoNode
 from .validate_op_node import ValidateOpNode
 from .file_formatter_node import FileFormatterNode
+from .op_context_node import OpContextNode
