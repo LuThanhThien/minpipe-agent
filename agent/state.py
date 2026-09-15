@@ -17,6 +17,11 @@ class GraphState(TypedDict):
     repo_prepare_succeeded: bool
     repo_prepare_output: str
 
+    # Op Context
+    op_context_result: dict
+    op_context_succeeded: str
+    op_context_error: bool
+
     # Generate op
     generate_attempts: int
     generate_succeeded: bool

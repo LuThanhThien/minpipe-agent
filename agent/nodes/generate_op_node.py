@@ -6,7 +6,7 @@ from loguru import logger
 from .base_node import BaseNode
 from ..providers import ModelProvider
 from ..state import GraphState
-from ..tools import apply_changes, read_file, read_prompt
+from ..tools import apply_changes, read_prompt
 
 
 class GenerateOpNode(BaseNode):
@@ -45,19 +45,14 @@ class GenerateOpNode(BaseNode):
         changed_files = []
 
         try:
-            context = self._build_context(
-                op=op,
-                test=test,
-                worktree_root=worktree_root,
-                validation_output=state.get(
-                    "validation_output",
-                    "",
-                ),
-                generate_error=state.get(
-                    "generate_error",
-                    "",
-                ),
-            )
+            context = state.get("op_context_result")
+
+            if not context:
+                return {
+                    "generate_succeeded": False,
+                    "generate_error": "op context is not available",
+                    "generate_attempts": attempts,
+                }
 
             prompt = self._build_prompt(
                 op=op,
@@ -106,124 +101,6 @@ class GenerateOpNode(BaseNode):
                 "generate_error": str(exc),
                 "generate_attempts": attempts,
             }
-
-    def _build_context(
-        self,
-        op: str,
-        test: str,
-        worktree_root: str,
-        validation_output: str,
-        generate_error: str,
-    ) -> dict:
-        return {
-            "failure": self._extract_failure(
-                validation_output,
-                op,
-            ),
-            "test_source": self._read_optional(
-                worktree_root,
-                test,
-            ),
-            "existing_op_source": self._read_optional(
-                worktree_root,
-                f"minpipe/ops/{op}.py",
-                default="Not found",
-            ),
-            "registry_source": self._read_optional(
-                worktree_root,
-                "minpipe/ops/operation.py",
-            ),
-            "ops_init_source": self._read_optional(
-                worktree_root,
-                "minpipe/ops/__init__.py",
-            ),
-            "similar_ops": self._build_similar_ops_context(
-                op=op,
-                worktree_root=worktree_root,
-            ),
-            "previous_validation_output": (
-                validation_output
-                if validation_output
-                else "No previous targeted validation output."
-            ),
-            "previous_generate_error": (
-                generate_error if generate_error else "No previous generation error."
-            ),
-        }
-
-    def _build_similar_ops_context(
-        self,
-        op: str,
-        worktree_root: str,
-    ) -> str:
-        candidates = [
-            "relu",
-            "sigmoid",
-            "square",
-        ]
-
-        sections = []
-
-        for candidate in candidates:
-            if candidate == op:
-                continue
-
-            path = f"minpipe/ops/{candidate}.py"
-
-            source = self._read_optional(
-                worktree_root,
-                path,
-                default="",
-            )
-
-            if not source:
-                continue
-
-            sections.append(f"# {path}\n\n{source}")
-
-        if not sections:
-            return "No similar working operations found."
-
-        return "\n\n".join(sections)
-
-    def _read_optional(
-        self,
-        worktree_root: str,
-        path: str,
-        default: str = "",
-    ) -> str:
-        try:
-            return read_file(
-                repo_root=worktree_root,
-                path=path,
-            )
-        except (FileNotFoundError, OSError):
-            return default
-
-    def _extract_failure(
-        self,
-        output: str,
-        op: str,
-    ) -> str:
-        if not output:
-            return f"Unknown operation: {op}"
-
-        patterns = [
-            rf"KeyError:\s*['\"]Unknown operation:\s*{re.escape(op)}['\"]",
-            rf"Unknown operation:\s*{re.escape(op)}",
-        ]
-
-        for pattern in patterns:
-            match = re.search(
-                pattern,
-                output,
-                re.IGNORECASE,
-            )
-
-            if match:
-                return match.group(0)
-
-        return output[-2000:]
 
     def _build_prompt(
         self,

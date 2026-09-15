@@ -65,6 +65,10 @@ def build_graph(config):
         "cleanup_repo",
         CleanupRepoNode(),
     )
+    graph.add_node(
+        "op_context",
+        OpContextNode(),
+    )
 
     # Edges
     graph.add_edge(START, "reset_state")
@@ -76,8 +80,16 @@ def build_graph(config):
         after_validate_op_route(),
         {
             "success": END,
-            "retry": "generate_op",
-            "failed": "generate_op",
+            "retry": "op_context",
+            "failed": "op_context",
+        },
+    )
+    graph.add_conditional_edges(
+        "op_context",
+        after_op_context_route(),
+        {
+            "success": "generate_op",
+            "failed": END,
         },
     )
     graph.add_conditional_edges(

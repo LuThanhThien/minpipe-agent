@@ -44,3 +44,14 @@ def after_formatting_route():
         return "failed"
 
     return _route
+
+
+def after_op_context_route():
+
+    def _route(state: TypedDict) -> str:
+        if state.get("op_context_succeeded", False):
+            return "success"
+
+        return "failed"
+
+    return _route
